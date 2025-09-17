@@ -106,16 +106,5 @@ WHERE o."Date_order" BETWEEN %s AND %s GROUP BY "День" ORDER BY "День" A
 <li><code>requirements.txt</code>: Зависимости.</li>
 <li><code>.env.example</code>: Шаблон конфигурации.</li>
 <li><code>README.md</code>: Это руководство.</li>
-</ul>
-<h2>Контрибьютинг</h2>
-<p>Приветствуем вклады! Создайте issue или pull request. Следуйте PEP 8 для кода. Тестируйте на локальной БД. Обсудите новые функции в issues.</p>
-<h2>Лицензия</h2>
-<p>MIT License. См. <a href="LICENSE">LICENSE</a>.</p>
-<h2>Дополнительные ресурсы</h2>
-<ul>
-<li>Дипломная работа: <a href="path/to/diploma.docx">ДИПЛОМ_2025_ИЭФ_ЭББ_411_Калинина_А_В.docx</a> — Полное описание разработки, анализа и экономических расчетов.</li>
-<li>Безопасность: Анализ Telegram (end-to-end encryption), меры защиты данных.</li>
-<li>Развертывание: Инструкции по Timeweb Cloud, BotFather.</li>
-</ul>
 <p>Проект разработан в рамках бакалаврской работы по направлению 38.03.05 «Бизнес-информатика» (РУТ МИИТ, 2025).</p>
 </artifact>
