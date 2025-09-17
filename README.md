@@ -69,7 +69,6 @@ DB_PORT=your_db_port
 </li>
 <li>Получите токен бота от @BotFather в Telegram.</li>
 <li>Сгенерируйте ключ шифрования: <code>from cryptography.fernet import Fernet; print(Fernet.generate_key())</code>.</li>
-<li>Настройте PostgreSQL: Импортируйте схему БД (SQL-скрипты в <code>/db/</code>).</li>
 </ul>
 </li>
 <li><strong>Разверните на сервере</strong>:
