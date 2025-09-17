@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ продаж</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans" style="background-color: rgb(209 211 229)">
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold text-center mb-6">Анализ продаж</h1>
+
+        {% if error_message %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <span class="block sm:inline">{{ error_message }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Date and Category Filter Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <form action="/sales" method="GET" class="space-y-4" onsubmit="return validateForm()">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+                    <div class="flex-1">
+                        <label for="period_type" class="block text-sm font-medium text-gray-700">Временной период</label>
+                        <select id="period_type" name="period_type" onchange="togglePeriodInputs()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" style="border: 1px solid #ced4da; padding: .375rem 2.25rem .375rem .75rem;">
+                            <option value="custom" {% if period_type == 'custom' %}selected{% endif %}>Пользовательский период</option>
+                            <option value="month" {% if period_type == 'month' %}selected{% endif %}>Месяц</option>
+                            <option value="year" {% if period_type == 'year' %}selected{% endif %}>Год</option>
+                            <option value="quarter" {% if period_type == 'quarter' %}selected{% endif %}>Кварталы</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Custom Date Inputs -->
+                <div id="custom_dates" class="flex flex-col sm:flex-row sm:space-x-4 {% if period_type != 'custom' %}hidden{% endif %}">
+                    <div class="flex-1">
+                        <label for="start_date" class="block text-sm font-medium text-gray-700">Начальная дата</label>
+                        <input type="date" id="start_date" name="start_date" value="{{ start_date }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" style="border: 1px solid #ced4da; padding: .375rem 2.25rem .375rem .75rem;">
+                    </div>
+                    <div class="flex-1">
+                        <label for="end_date" class="block text-sm font-medium text-gray-700">Конечная дата</label>
+                        <input type="date" id="end_date" name="end_date" value="{{ end_date }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" style="border: 1px solid #ced4da; padding: .375rem 2.25rem .375rem .75rem;">
+                    </div>
+                </div>
+
+                <!-- Year Selection -->
+                <div id="year_selection" class="flex flex-col sm:flex-row sm:space-x-4 {% if period_type != 'year' %}hidden{% endif %}">
+                    <div class="flex-1">
+                        <label for="selected_year" class="block text-sm font-medium text-gray-700">Год</label>
+                        <select id="selected_year" name="selected_year" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            {% for year in range(2023, 2026) %}
+                            <option value="{{ year }}" {% if selected_year == year|string %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Month Selection -->
+                <div id="month_selection" class="flex flex-col sm:flex-row sm:space-x-4 {% if period_type != 'month' %}hidden{% endif %}">
+                    <div class="flex-1">
+                        <label for="selected_month" class="block text-sm font-medium text-gray-700">Месяц</label>
+                        <select id="selected_month" name="selected_month" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            {% for month in range(1, 13) %}
+                            <option value="{{ month }}" {% if selected_month == month|string %}selected{% endif %}>{{ month }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="selected_year_month" class="block text-sm font-medium text-gray-700">Год</label>
+                        <select id="selected_year_month" name="selected_year" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            {% for year in range(2023, 2026) %}
+                            <option value="{{ year }}" {% if selected_year == year|string %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Quarter Selection -->
+                <div id="quarter_selection" class="flex flex-col sm:flex-row sm:space-x-4 {% if period_type != 'quarter' %}hidden{% endif %}">
+                    <div class="flex-1">
+                        <label for="selected_quarter" class="block text-sm font-medium text-gray-700">Кварталы</label>
+                        <select id="selected_quarter" name="selected_quarter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="1" {% if selected_quarter == '1' %}selected{% endif %}>I (Янв-Март)</option>
+                            <option value="2" {% if selected_quarter == '2' %}selected{% endif %}>II (Апр-Июнь)</option>
+                            <option value="3" {% if selected_quarter == '3' %}selected{% endif %}>III (Июль-Сент)</option>
+                            <option value="4" {% if selected_quarter == '4' %}selected{% endif %}>IV (Окт-Дек)</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="selected_year_quarter" class="block text-sm font-medium text-gray-700">Год</label>
+                        <select id="selected_year_quarter" name="selected_year" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            {% for year in range(2023, 2026) %}
+                            <option value="{{ year }}" {% if selected_year == year|string %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Category Selection -->
+                <div class="flex flex-col sm:flex-row sm:space-x-4">
+                    <div class="flex-1">
+                        <label for="selected_category" class="block text-sm font-medium text-gray-700">Категория товаров</label>
+                        <select id="selected_category" name="selected_category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" style="border: 1px solid #ced4da; padding: .375rem 2.25rem .375rem .75rem;">
+                            <option value="">Все категории</option>
+                            {% for category in categories %}
+                            <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Применить
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Прибыль -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full">
+                <!-- Summary Statistics -->
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Основные показатели за период</h2>
+                    {% if summary_stats %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm font-medium text-gray-600">Общая выручка за период:</p>
+                            <p class="text-lg font-bold text-gray-900">{{ summary_stats.total_revenue | format_currency }} ₽</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm font-medium text-gray-600">Общая чистая прибыль:</p>
+                            <p class="text-lg font-bold text-gray-900">{{ summary_stats.net_profit | format_currency }} ₽</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm font-medium text-gray-600">Общие расходы за период:</p>
+                            <p class="text-lg font-bold text-gray-900">{{ summary_stats.total_expenses | format_currency }} ₽</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm font-medium text-gray-600">Количество продаж:</p>
+                            <p class="text-lg font-bold text-gray-900">{{ summary_stats.total_orders }}</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm font-medium text-gray-600">Общие расходы за период:</p>
+                            <p class="text-lg font-bold text-gray-900">{{ summary_stats.total_expenses | format_currency }} ₽</p>
+                            <p class="text-sm font-medium text-gray-600">
+                             <p class="text-sm font-medium text-gray-600">Включает:</p>
+                             <p class="text-sm font-medium text-gray-600">Себестоимость товаров ({{ summary_stats.cost_of_goods_sold | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Зарплаты ({{ summary_stats.salary_expenses | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Аренда ({{ summary_stats.rent_expenses | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Маркетинг ({{ summary_stats.marketing | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Логистика ({{ summary_stats.logistics | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Коммунальные услуги ({{ summary_stats.utilities | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Связь ({{ summary_stats.mobile_phone | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Амортизация оборудования ({{ summary_stats.equipment_depreciation | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">НДС ({{ summary_stats.vat | format_currency }} ₽)</p>
+                             <p class="text-sm font-medium text-gray-600">Налог на прибыль ({{ summary_stats.profit_tax | format_currency }} ₽)</p>
+                            </p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-gray-600">Данные за выбранный период недоступны.</p>
+                    {% endif %}
+                </div>
+                <!-- Gross Profit Chart -->
+                <div class="min-h-[400px]" data-chart="gross_chart">
+                    {{ gross_chart | safe }}
+                </div>
+            </div>
+            <!-- Кол-во заказов -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[400px]" data-chart="orders_chart">
+                {{ orders_chart | safe }}
+            </div>
+            <!-- Средний чек -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[400px]" data-chart="avg_chart">
+                {{ avg_chart | safe }}
+            </div>
+            <!-- Два графика на всю ширину вдвоём -->
+            <div class="col-span-full grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Процент выручки по магазинам -->
+                <div class="bg-white p-6 rounded-lg shadow-md min-h-[400px]" data-chart="revenue_store_chart">
+                    {{ revenue_store_chart | safe }}
+                </div>
+                <!-- Процент заказов по магазинам -->
+                <div class="bg-white p-6 rounded-lg shadow-md min-h-[400px]" data-chart="orders_store_chart">
+                    {{ orders_store_chart | safe }}
+                </div>
+            </div>
+            <!-- Выручка по брендам -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[400px]" data-chart="brands_chart">
+                {{ brands_chart | safe }}
+            </div>
+            <!-- Выручка по категориям -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[400px]" data-chart="categories_chart">
+                {{ categories_chart | safe }}
+            </div>
+            <!-- Продажи по менеджерам -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[400px]" data-chart="managers_chart">
+                {{ managers_chart | safe }}
+            </div>
+            <!-- Средняя выручка -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[400px]" data-chart="arpu_chart">
+                {{ arpu_chart | safe }}
+            </div>
+            <!-- Финансовые показатели по категориям -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[600px]" data-chart="margin_chart">
+                {{ margin_chart | safe }}
+            </div>
+            <!-- Расширенные финансовые показатели -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-full min-h-[500px]" data-chart="profitability_chart">
+                {{ profitability_chart | safe }}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to toggle visibility of period inputs based on period_type
+        function togglePeriodInputs() {
+            const periodType = document.getElementById('period_type').value;
+            document.getElementById('custom_dates').classList.add('hidden');
+            document.getElementById('month_selection').classList.add('hidden');
+            document.getElementById('year_selection').classList.add('hidden');
+            document.getElementById('quarter_selection').classList.add('hidden');
+
+            if (periodType === 'custom') {
+                document.getElementById('custom_dates').classList.remove('hidden');
+            } else if (periodType === 'month') {
+                document.getElementById('month_selection').classList.remove('hidden');
+            } else if (periodType === 'year') {
+                document.getElementById('year_selection').classList.remove('hidden');
+            } else if (periodType === 'quarter') {
+                document.getElementById('quarter_selection').classList.remove('hidden');
+            }
+        }
+
+        // Function to validate and submit the form
+        function validateForm(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const periodType = document.getElementById('period_type').value;
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            const selectedMonth = document.getElementById('selected_month')?.value;
+            const selectedYearMonth = document.getElementById('selected_year_month')?.value;
+            const selectedYear = document.getElementById('selected_year')?.value;
+            const selectedYearQuarter = document.getElementById('selected_year_quarter')?.value;
+            const selectedQuarter = document.getElementById('selected_quarter')?.value;
+            const selectedCategory = document.getElementById('selected_category').value;
+
+            // Build query parameters based on period_type
+            const params = new URLSearchParams();
+            params.append('period_type', periodType);
+            if (selectedCategory) {
+                params.append('selected_category', selectedCategory);
+            }
+
+            if (periodType === 'custom') {
+                if (!startDate || !endDate) {
+                    alert('Пожалуйста, выберите начальную и конечную дату.');
+                    return false;
+                }
+                if (new Date(startDate) > new Date(endDate)) {
+                    alert('Начальная дата не может быть позже конечной даты.');
+                    return false;
+                }
+                params.append('start_date', startDate);
+                params.append('end_date', endDate);
+            } else if (periodType === 'month') {
+                if (!selectedMonth || !selectedYearMonth) {
+                    alert('Пожалуйста, выберите месяц и год.');
+                    return false;
+                }
+                params.append('selected_month', selectedMonth);
+                params.append('selected_year', selectedYearMonth);
+            } else if (periodType === 'year') {
+                if (!selectedYear) {
+                    alert('Пожалуйста, выберите год.');
+                    return false;
+                }
+                params.append('selected_year', selectedYear);
+            } else if (periodType === 'quarter') {
+                if (!selectedQuarter || !selectedYearQuarter) {
+                    alert('Пожалуйста, выберите квартал и год.');
+                    return false;
+                }
+                params.append('selected_quarter', selectedQuarter);
+                params.append('selected_year', selectedYearQuarter);
+            }
+
+            // Redirect with the constructed query string
+            window.location.href = `/sales?${params.toString()}`;
+            return false;
+        }
+
+        // Initialize the form on page load
+        togglePeriodInputs();
+    </script>
+</body>
+</html>

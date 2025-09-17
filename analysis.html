@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Анализ товара</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: rgb(209 211 229); }
+        .card { margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .card-header { font-weight: bold; background-color: #f1f8ff; }
+        .chart-container { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; background: white; border-radius: 5px; }
+        .product-image { max-width: 200px; margin: 0 auto; display: block; }
+        .info-table { width: 100%; margin-bottom: 15px; }
+        .info-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .info-table tr:last-child td { border-bottom: none; }
+        select { padding: 5px; margin-bottom: 15px; }
+        .date-filter { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .star-rating {
+            display: inline-block;
+            font-size: 20px;
+            line-height: 1;
+            position: relative;
+        }
+        .star-rating > span {
+            display: inline-block;
+            position: relative;
+            color: #ccc;
+            text-shadow: 0 0 1px #000;
+        }
+        .star-rating > span::before {
+            content: '★';
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: #ffc107;
+            width: 0;
+            overflow: hidden;
+        }
+        .star-rating > span:nth-child(1)::before {
+            width: calc((var(--rating) - 0) * 100%);
+        }
+        .star-rating > span:nth-child(2)::before {
+            width: calc((var(--rating) - 1) * 100%);
+        }
+        .star-rating > span:nth-child(3)::before {
+            width: calc((var(--rating) - 2) * 100%);
+        }
+        .star-rating > span:nth-child(4)::before {
+            width: calc((var(--rating) - 3) * 100%);
+        }
+        .star-rating > span:nth-child(5)::before {
+            width: calc((var(--rating) - 4) * 100%);
+        }
+        #dynamic-search-results ul {
+            padding: 0;
+        }
+        #dynamic-search-results .list-group-item {
+            cursor: pointer;
+        }
+        #dynamic-search-results .list-group-item:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="my-4" style="text-align: center; font-weight: bold;">Анализ товара</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span id="header-title">Выбор товара</span>
+                <button id="toggle-filter" class="btn btn-outline-primary btn-sm">Фильтр</button>
+            </div>
+            <div class="card-body">
+                <!-- Блок с выпадающим списком товаров -->
+                <div id="select-block" {% if show_filter %}style="display: none;"{% endif %}>
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-12">
+                            <label for="good_id" class="form-label">Товар:</label>
+                            <select name="good_id" id="good_id" class="form-select" onchange="this.form.submit()">
+                                {% for good_id, good_name in goods %}
+                                    <option value="{{ good_id }}" {% if good_id == selected_good_id %}selected{% endif %}>
+                                        {{ good_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Блок с фильтрами -->
+                <div id="filter-block" {% if not show_filter %}style="display: none;"{% endif %}>
+                    <form method="GET" class="row g-3">
+                        <input type="hidden" name="show_filter" value="true">
+                        
+                        <div class="row">
+                            <!-- Тип фильтра слева -->
+                            <div class="col-md-3">
+                                <h5>Тип фильтра:</h5>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="filter_type" id="filter_name" value="name" onchange="toggleFilterFields()" {% if filter_type == 'name' %}checked{% endif %}>
+                                    <label class="form-check-label" for="filter_name">По названию</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="filter_type" id="filter_id" value="id" onchange="toggleFilterFields()" {% if filter_type == 'id' %}checked{% endif %}>
+                                    <label class="form-check-label" for="filter_id">По ID</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="filter_type" id="filter_category_country" value="category_country" onchange="toggleFilterFields()" {% if filter_type == 'category_country' %}checked{% endif %}>
+                                    <label class="form-check-label" for="filter_category_country">По категории и стране</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="filter_type" id="filter_name_country" value="name_country" onchange="toggleFilterFields()" {% if filter_type == 'name_country' %}checked{% endif %}>
+                                    <label class="form-check-label" for="filter_name_country">По названию и стране</label>
+                                </div>
+                            </div>
+
+                            <!-- Поля ввода справа -->
+                            <div class="col-md-9">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="search_name" class="form-label">По названию:</label>
+                                        <input type="text" class="form-control" id="search_name" name="search_name" placeholder="Введите название" value="{{ search_name or '' }}" oninput="dynamicSearch()" disabled>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="search_id" class="form-label">По ID:</label>
+                                        <input type="number" class="form-control" id="search_id" name="search_id" placeholder="Введите ID" value="{{ search_id or '' }}" disabled>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="search_country" class="form-label">По стране:</label>
+                                        <select name="search_country" id="search_country" class="form-select" disabled>
+                                            <option value="">Все страны</option>
+                                            {% for country in countries %}
+                                                <option value="{{ country }}" {% if search_country == country %}selected{% endif %}>{{ country }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="search_category" class="form-label">По категории:</label>
+                                        <select name="search_category" id="search_category" class="form-select" disabled>
+                                            <option value="">Все категории</option>
+                                            {% for category in categories %}
+                                                <option value="{{ category }}" {% if search_category == category %}selected{% endif %}>{{ category }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 d-flex justify-content-end mt-3">
+                            <button type="submit" class="btn btn-primary me-2">Применить</button>
+                            <a href="?" class="btn btn-outline-secondary">Сбросить</a>
+                        </div>
+                    </form>
+
+                    <!-- Динамический список товаров для поиска по названию -->
+                    <div id="dynamic-search-results" class="mt-3" style="max-height: 200px; overflow-y: auto; display: none;">
+                        <ul class="list-group" id="search-results-list">
+                        </ul>
+                    </div>
+
+                    <!-- Список отфильтрованных товаров -->
+                    {% if goods and show_filter %}
+                    <div class="mt-3">
+                        <h5>Подходящие товары:</h5>
+                        <ul class="list-group">
+                            {% for good_id, good_name in goods %}
+                            <li class="list-group-item">
+                                <a href="?good_id={{ good_id }}">{{ good_name }} (ID: {{ good_id }})</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        {% if info_card %}
+        <div class="card mb-4">
+            <div class="card-header">
+                Информация о товаре <span class="badge bg-secondary">ID: {{ info_card.id }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <img src="{{ url_for('serve_image', good_id=info_card.id) }}" class="product-image mb-3">
+                    </div>
+                    <div class="col-md-9">
+                        <h2>{{ info_card.name }}</h2>
+                        <table class="info-table">
+                            <tr><td>Бренд:</td><td>{{ info_card.brand }}</td></tr>
+                            <tr><td>Тип:</td><td>{{ info_card.type }}</td></tr>
+                            <tr><td>Категория:</td><td>{{ info_card.category }}</td></tr>
+                            <tr><td>Страна производства:</td><td>{{ info_card.country }}</td></tr>
+                            <tr><td>Цена:</td>
+                                <td>
+                                    {% if info_card.discount > 0 %}
+                                        <span class="text-danger">{{ info_card.discounted_price }} ₽</span>
+                                        <small class="text-muted text-decoration-line-through">{{ info_card.price }} ₽</small>
+                                        <span class="badge bg-danger">-{{ info_card.discount }}%</span>
+                                    {% else %}
+                                        {{ info_card.price }} ₽
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr><td>Срок годности:</td><td>{{ info_card.storage_life }}</td></tr>
+                            {% if ratings and ratings.avg_rating %}
+                            <tr>
+                                <td>Оценка:</td>
+                                <td>
+                                    <div class="star-rating" style="--rating: {{ ratings.avg_rating }};">
+                                        <span>★</span>
+                                        <span>★</span>
+                                        <span>★</span>
+                                        <span>★</span>
+                                        <span>★</span>
+                                    </div>
+                                    <span>({{ ratings.avg_rating }} / 5)</span>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    {{ pop_chart | safe }}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    {{ rating_chart | safe }}
+                </div>
+            </div>
+        </div>
+        
+        {% if show_date_filter %}
+        <div class="card mb-4">
+            <div class="card-header">Фильтр по дате для анализа продаж</div>
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <input type="hidden" name="good_id" value="{{ selected_good_id }}">
+                    <div class="col-md-3">
+                        <label for="start_date" class="form-label">Дата начала:</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="end_date" class="form-label">Дата окончания:</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">Применить фильтр</button>
+                        <a href="?good_id={{ selected_good_id }}" class="btn btn-outline-secondary">Сбросить</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="chart-container">
+            <h4>Динамика продаж</h4>
+            {{ sales_chart | safe }}
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    {{ gender_chart | safe }}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    {{ holiday_chart | safe }}
+                </div>
+            </div>
+        </div>
+        
+{% if availability %}
+<div class="card mb-4">
+    <div class="card-header">Наличие в магазинах</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Город</th>
+                        <th>Адрес</th>
+                        <th>Склад</th>
+                        <th>Количество</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in availability %}
+                    <tr>
+                        <td>{{ item[0] }}</td>
+                        <td>{{ item[1] }}, д. {{ item[2] }}</td>
+                        <td>{{ item[3] }}</td>
+                        <td>{{ item[4] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if suppliers %}
+<div class="card mb-4">
+    <div class="card-header">Поставщики</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Поставщик</th>
+                        <th>Контактное лицо</th>
+                        <th>Телефон</th>
+                        <th>Дата поставки</th>
+                        <th>Цена поставки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for supplier in suppliers %}
+                    <tr>
+                        <td>{{ supplier[0] }}</td>
+                        <td>{{ supplier[1] }}</td>
+                        <td>{{ supplier[2] }}</td>
+                        <td>{{ supplier[3] }}</td>
+                        <td>{{ supplier[4] }} ₽</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+    </div>
+
+    <script>
+        // Переключение между выбором товара и фильтром
+        document.getElementById('toggle-filter').addEventListener('click', function() {
+            const selectBlock = document.getElementById('select-block');
+            const filterBlock = document.getElementById('filter-block');
+            const headerTitle = document.getElementById('header-title');
+            const isFilterVisible = filterBlock.style.display !== 'none';
+
+            if (isFilterVisible) {
+                selectBlock.style.display = 'block';
+                filterBlock.style.display = 'none';
+                headerTitle.textContent = 'Выбор товара';
+                this.textContent = 'Фильтр';
+            } else {
+                selectBlock.style.display = 'none';
+                filterBlock.style.display = 'block';
+                headerTitle.textContent = 'Фильтр';
+                this.textContent = 'Выбор товара';
+            }
+        });
+
+        // Управление активностью полей фильтрации
+        function toggleFilterFields() {
+            const searchName = document.getElementById('search_name');
+            const searchId = document.getElementById('search_id');
+            const searchCountry = document.getElementById('search_country');
+            const searchCategory = document.getElementById('search_category');
+            const filterName = document.getElementById('filter_name');
+            const filterId = document.getElementById('filter_id');
+            const filterCategoryCountry = document.getElementById('filter_category_country');
+            const filterNameCountry = document.getElementById('filter_name_country');
+
+            // Отключаем все поля
+            searchName.disabled = true;
+            searchId.disabled = true;
+            searchCountry.disabled = true;
+            searchCategory.disabled = true;
+
+            // Включаем поля в зависимости от выбранного типа фильтра
+            if (filterName.checked) {
+                searchName.disabled = false;
+            } else if (filterId.checked) {
+                searchId.disabled = false;
+            } else if (filterCategoryCountry.checked) {
+                searchCountry.disabled = false;
+                searchCategory.disabled = false;
+            } else if (filterNameCountry.checked) {
+                searchName.disabled = false;
+                searchCountry.disabled = false;
+            }
+
+            // Скрываем динамический список, если поле "По названию" не активно
+            const resultsDiv = document.getElementById('dynamic-search-results');
+            if (!filterName.checked && !filterNameCountry.checked) {
+                resultsDiv.style.display = 'none';
+            }
+        }
+
+        // Динамический поиск по названию
+        function dynamicSearch() {
+            const filterName = document.getElementById('filter_name');
+            const filterNameCountry = document.getElementById('filter_name_country');
+            if (!filterName.checked && !filterNameCountry.checked) return; // Не выполняем поиск, если не выбран подходящий фильтр
+
+            const searchInput = document.getElementById('search_name').value;
+            const searchCountry = document.getElementById('search_country').value;
+            const resultsDiv = document.getElementById('dynamic-search-results');
+            const resultsList = document.getElementById('search-results-list');
+
+            if (searchInput.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            let url = `/search_goods?search_name=${encodeURIComponent(searchInput)}`;
+            if (filterNameCountry.checked && searchCountry) {
+                url += `&search_country=${encodeURIComponent(searchCountry)}`;
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    resultsList.innerHTML = '';
+                    if (data.length === 0) {
+                        resultsDiv.style.display = 'none';
+                        return;
+                    }
+
+                    data.forEach(good => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `<a href="?good_id=${good.id}">${good.name} (ID: ${good.id})</a>`;
+                        resultsList.appendChild(li);
+                    });
+                    resultsDiv.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Ошибка при поиске:', error);
+                    resultsDiv.style.display = 'none';
+                });
+        }
+
+        // Вызываем toggleFilterFields при загрузке страницы
+        window.onload = function() {
+            toggleFilterFields();
+        };
+    </script>
+
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'931cc9b61baeb087',t:'MTc0NDkwMTk4My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
