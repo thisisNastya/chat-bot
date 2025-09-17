@@ -106,5 +106,6 @@ WHERE o."Date_order" BETWEEN %s AND %s GROUP BY "День" ORDER BY "День" A
 <li><code>requirements.txt</code>: Зависимости.</li>
 <li><code>.env.example</code>: Шаблон конфигурации.</li>
 <li><code>README.md</code>: Это руководство.</li>
+<p>
 <p>Проект разработан в рамках бакалаврской работы по направлению 38.03.05 «Бизнес-информатика» (РУТ МИИТ, 2025).</p>
 </artifact>
